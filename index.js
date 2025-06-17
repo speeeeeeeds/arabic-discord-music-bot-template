@@ -8,6 +8,15 @@ const keepAlive = require("./keep_alive");
 const { execFile } = require("child_process");
 const fs = require("fs");
 
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => res.send('Bot is alive!'));
+
+app.listen(3000, () => {
+  console.log('✅ KeepAlive server running');
+});
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
