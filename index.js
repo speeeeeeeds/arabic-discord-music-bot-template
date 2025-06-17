@@ -5,23 +5,31 @@ const { SoundCloudPlugin } = require("@distube/soundcloud");
 const { SpotifyPlugin } = require("@distube/spotify");
 const { YtDlpPlugin } = require("@distube/yt-dlp");
 const keepAlive = require("./keep_alive");
+const { execFile } = require("child_process");
+const fs = require("fs");
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
+
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
   leaveOnStop: false,
   plugins: [new SoundCloudPlugin(), new SpotifyPlugin(), new YtDlpPlugin()]
 });
 
+// ✅ ضع هنا ID الروم الذي تريد إرسال الصور إليه
+const targetChannelId = "1324073373440938140"; // ← استبدله بـ ID الروم المطلوب
+
 client.on("ready", () => {
   console.log(`✅ البوت جاهز ✅ - Logged in as ${client.user.tag}`);
 });
+
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   const args = message.content.split(" ");
   const cmd = args.shift().toLowerCase();
+
   switch (cmd) {
     case "!p":
       distube.play(message.member.voice.channel, args.join(" "), { textChannel: message.channel, member: message.member });
@@ -62,6 +70,24 @@ client.on("messageCreate", async message => {
       distube.setVolume(message, vol);
       message.channel.send(`🔊 تم ضبط الصوت لـ ${vol}%`);
       break;
+    case "!cover":
+      if (args.length < 2) return message.channel.send("❌ استخدم: !cover [اسم الأغنية] [رابط الغلاف]");
+      const song = args[0];
+      const cover = args[1];
+      const script = "python/generate_image.py";
+
+      execFile("python3", [script, song, cover], (err, stdout) => {
+        if (err) return message.channel.send("❌ خطأ في توليد الصورة.");
+        const img = stdout.trim();
+        if (fs.existsSync(img)) {
+          const channel = client.channels.cache.get(targetChannelId);
+          if (!channel) return message.channel.send("⚠️ لم يتم العثور على الروم الهدف.");
+          channel.send({ content: `🎵 ${song}`, files: [img] });
+        } else {
+          message.channel.send("❌ تعذر العثور على الصورة الناتجة.");
+        }
+      });
+      break;
     case "!help":
       message.channel.send(`الأوامر المتاحة:
 !p [رابط/كلمة] – تشغيل  
@@ -73,7 +99,8 @@ client.on("messageCreate", async message => {
 !resume – استئناف  
 !queue – عرض القائمة  
 !np – الأغنية الحالية  
-!vol [1-100] – تحكم بالصوت`);
+!vol [1-100] – تحكم بالصوت  
+!cover [اسم] [رابط غلاف] – توليد صورة مشغل الأغنية`);
       break;
   }
 });
